@@ -1,1 +1,3 @@
-from app.config import config
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
