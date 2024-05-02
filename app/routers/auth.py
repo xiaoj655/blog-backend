@@ -9,14 +9,18 @@ from app.schema.user import User
 from passlib.context import CryptContext
 from typing import Union
 from datetime import datetime, timedelta, timezone
+from app.utils.mail import send_verify_mail
+from app.config import config
+import uuid
 
 router = APIRouter(
   prefix='/auth'
 )
 pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 user_db = db.user
+verify_dict = {}
 oauth2_schema = OAuth2PasswordBearer(tokenUrl='token')
-SECRET_KEY = "affdf98c14d3e6ac5b4b95017f3ccc5f9ad9272066506f680ceae9264867d8cc"
+SECRET_KEY = config.hash_secret
 ALGORITHM = "HS256"
 
 def create_access_token(data: dict, expire_delata: Union[timedelta, None]=None):
@@ -71,13 +75,30 @@ async def post(user: User):
         return {
             "code": status.HTTP_409_CONFLICT
         }
+    
+    _uuid = uuid.uuid4()
+    flag = send_verify_mail(user.email, _uuid)
+    if flag:
+        verify_dict.update({str(_uuid): user})
+        return {
+            "code": 200
+        }
+    else :
+        return {
+            "code": 500
+        }
 
-    _user = {}
-    _user["user_name"] = user.user_name
-    _user["email"] = user.email
-    _user["password"] = pwd_context.hash(user.password)
-    ret = user_db.insert_one(jsonable_encoder(_user))
-    return {
-        "id": str(ret.inserted_id),
-        "code": status.HTTP_201_CREATED
-    }
+@router.get('/verify/{verify_code}', status_code=status.HTTP_200_OK)
+async def verify(verify_code: str):
+    if verify_code in verify_dict:
+        pwd = pwd_context.hash(verify_dict[verify_code].password)
+        email = verify_dict[verify_code].email
+        user_db.insert_one(jsonable_encoder({"email": email, "password": pwd, 'name': ''}))
+        del verify_dict[verify_code]
+        return {
+            "code": 200
+        }
+    else:
+        return {
+            "code": 404
+        }
