@@ -1,8 +1,9 @@
 from fastapi import APIRouter, status, Depends, Body
+from typing import List
 from fastapi.encoders import jsonable_encoder
 from app.database.db import db
 from .auth import get_current_user
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from bson.objectid import ObjectId
 
@@ -42,3 +43,18 @@ async def post(user: dict = Depends(get_current_user), article: Article = Body(.
         "code": 200,
         "id": str(ret.inserted_id)
     }
+
+class ArticleList(BaseModel):
+    id:            str = Field(..., alias='_id')
+    title:          str
+    content:        str
+    publish_by:     str
+    publish_time:   str
+
+@router.get('/list', response_model=List[ArticleList])
+async def get():
+    ret = article_db.find({})
+    _ret = list(ret)
+    for x in _ret:
+        x['_id'] = str(x['_id'])
+    return _ret
