@@ -1,11 +1,12 @@
 from fastapi import APIRouter, status, Depends, Body
-from typing import List
+from typing import List, Annotated, Union
 from fastapi.encoders import jsonable_encoder
 from app.database.db import db
 from .auth import get_current_user
 from pydantic import BaseModel, Field
 from datetime import datetime
 from bson.objectid import ObjectId
+
 
 router = APIRouter(
   prefix="/article"
@@ -51,9 +52,16 @@ class ArticleList(BaseModel):
     publish_by:     str
     publish_time:   str
 
+async def common_parameters(
+    q: Union[str, None] = None, skip: int = 0, limit: int = 50
+):
+    return {"q": q, "skip": skip, "limit": limit}
+
+
 @router.get('/list', response_model=List[ArticleList])
-async def get():
-    ret = article_db.find({})
+async def get(query: dict = Depends(common_parameters)):
+    print(query)
+    ret = article_db.find().limit(query['limit']).skip(query['skip'])
     _ret = list(ret)
     for x in _ret:
         x['_id'] = str(x['_id'])
